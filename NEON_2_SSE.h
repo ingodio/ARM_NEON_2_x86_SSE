@@ -9984,6 +9984,14 @@ _NEON2SSE_GLOBAL void vst1_lane_p16(__transfersize(1) poly16_t * ptr, poly16x4_t
 //***********************************************************************************************
 //These intrinsics load or store an n-element structure. The array structures are defined in the beginning
 //We assume ptr is NOT aligned in general case, for more details see  "Loads and stores of a single vector functions"
+_NEON2SSESTORAGE uint8x16x2_t vld1q_u8_x2(__transfersize(32) uint8_t const * ptr);
+_NEON2SSE_INLINE uint8x16x2_t vld1q_u8_x2(__transfersize(32) uint8_t const * ptr)
+{
+    uint8x16x2_t v;
+    v.val[0] = vld1q_u8(ptr);
+    v.val[1] = vld1q_u8(ptr + 16);
+    return v;
+}
 //****************** 2 elements load  *********************************************
 _NEON2SSESTORAGE uint8x16x2_t vld2q_u8(__transfersize(32) uint8_t const * ptr); // VLD2.8 {d0, d2}, [r0]
 _NEON2SSE_INLINE uint8x16x2_t vld2q_u8(__transfersize(32) uint8_t const * ptr) // VLD2.8 {d0, d2}, [r0]
