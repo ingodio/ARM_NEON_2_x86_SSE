@@ -10036,6 +10036,11 @@ _NEON2SSE_INLINE float vmaxvq_f32(float32x4_t a)
     return _mm_cvtss_f32(t);
 }
 
+_NEON2SSE_INLINE float32x4_t vfmaq_f32(float32x4_t a, float32x4_t b, float32x4_t c)
+{
+    return _mm_add_ps(a, _mm_mul_ps(b, c));
+}
+
 _NEON2SSE_INLINE uint16x8_t vceqq_f16(float16x8_t a, float16x8_t b)
 {
     __m128i lo = _mm_castps_si128(_mm_cmpeq_ps(a.val[0], b.val[0]));
