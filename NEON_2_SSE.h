@@ -6223,6 +6223,16 @@ _NEON2SSE_GLOBAL int32x4_t   vmaxq_s32(int32x4_t a, int32x4_t b); // VMAX.S32 q0
 _NEON2SSE_GLOBAL uint8x16_t   vmaxq_u8(uint8x16_t a, uint8x16_t b); // VMAX.U8 q0,q0,q0
 #define vmaxq_u8 _mm_max_epu8
 
+_NEON2SSE_INLINE uint8_t vmaxvq_u8(uint8x16_t v)
+{
+    v = _mm_max_epu8(v, _mm_srli_si128(v, 8));
+    v = _mm_max_epu8(v, _mm_srli_si128(v, 4));
+    v = _mm_max_epu8(v, _mm_srli_si128(v, 2));
+    v = _mm_max_epu8(v, _mm_srli_si128(v, 1));
+
+    return (uint8_t)_mm_cvtsi128_si32(v);
+}
+
 _NEON2SSE_GLOBAL uint16x8_t   vmaxq_u16(uint16x8_t a, uint16x8_t b); // VMAX.s16 q0,q0,q0
 #define vmaxq_u16 _MM_MAX_EPU16 //SSE4.1
 
@@ -9494,6 +9504,16 @@ _NEON2SSE_INLINE float16x8_t vld1q_f16(__transfersize(8) __fp16 const * ptr)// V
     return result;
 }
 
+_NEON2SSE_INLINE float16x8x4_t vld1q_f16_x4(const __fp16* ptr)
+{
+    float16x8x4_t result;
+    result.val[0] = vld1q_f16(ptr);
+    result.val[1] = vld1q_f16(ptr + 8);
+    result.val[2] = vld1q_f16(ptr + 16);
+    result.val[3] = vld1q_f16(ptr + 24);
+    return result;
+}
+
 //_NEON2SSE_GLOBAL float16x8_t vdupq_n_f16(float value);
 _NEON2SSE_INLINE float16x8_t vdupq_n_f16(float value)
 {
@@ -9516,6 +9536,18 @@ _NEON2SSE_INLINE float32x4x2_t vld1q_f32_x2(const float *ptr)
     result.val[0] = _mm_loadu_ps(ptr);
     result.val[1] = _mm_loadu_ps(ptr + 4);
     return result;
+}
+
+_NEON2SSE_INLINE float32x4x4_t vld1q_f32_x4(const float32_t* ptr)
+{
+    float32x4x4_t r;
+
+    r.val[0] = _mm_loadu_ps(ptr);
+    r.val[1] = _mm_loadu_ps(ptr + 4);
+    r.val[2] = _mm_loadu_ps(ptr + 8);
+    r.val[3] = _mm_loadu_ps(ptr + 12);
+
+    return r;
 }
 
 _NEON2SSE_GLOBAL poly8x16_t vld1q_p8(__transfersize(16) poly8_t const * ptr); // VLD1.8 {d0, d1}, [r0]
@@ -9945,6 +9977,18 @@ _NEON2SSE_INLINE float vmaxvq_f16(float16x8_t a)
     return _mm_cvtss_f32(max);
 }
 
+_NEON2SSE_INLINE uint16_t vmaxvq_u16(uint16x8_t a)
+{
+    __m128i max = a;
+    // Reduce 8 x uint16 to 4 x uint16
+    max = _mm_max_epu16(max, _mm_shuffle_epi32(max, _MM_SHUFFLE(1, 0, 3, 2)));
+    // Reduce 4 x uint16 to 2 x uint16
+    max = _mm_max_epu16(max, _mm_shufflelo_epi16(max, _MM_SHUFFLE(1, 0, 3, 2)));
+    // Reduce 2 x uint16 to 1 x uint16
+    max = _mm_max_epu16(max, _mm_srli_si128(max, 2));
+    return (uint16_t)_mm_extract_epi16(max, 0);
+}
+
 _NEON2SSE_INLINE float16x4_t vadd_f16(float16x4_t a, float16x4_t b)
 {
     float16x4_t result;
@@ -10060,6 +10104,14 @@ _NEON2SSE_INLINE uint16x8_t vceqq_f16(float16x8_t a, float16x8_t b)
 _NEON2SSE_GLOBAL void vst1q_f32(__transfersize(4) float32_t * ptr, float32x4_t val); // VST1.32 {d0, d1}, [r0]
 #define vst1q_f32  _mm_storeu_ps
 
+static inline void vst1q_f32_x4(float32_t* ptr, float32x4x4_t val)
+{
+    vst1q_f32(ptr,      val.val[0]);
+    vst1q_f32(ptr + 4,  val.val[1]);
+    vst1q_f32(ptr + 8,  val.val[2]);
+    vst1q_f32(ptr + 12, val.val[3]);
+}
+
 _NEON2SSE_GLOBAL void vst1q_p8(__transfersize(16) poly8_t * ptr, poly8x16_t val); // VST1.8 {d0, d1}, [r0]
 #define vst1q_p8  vst1q_u8
 
@@ -10128,6 +10180,12 @@ _NEON2SSE_INLINE void vst1_f32(__transfersize(2) float32_t * ptr, float32x2_t va
     *(ptr) =   val.m64_f32[0];
     *(ptr + 1) = val.m64_f32[1];
     return;
+}
+
+_NEON2SSE_INLINE uint32x4_t vshll_high_n_u16(uint16x8_t a, __constrange(0,16) int b)
+{
+    return _mm_slli_epi32(
+        _mm_unpackhi_epi16(a, _mm_setzero_si128()), b);
 }
 
 _NEON2SSE_GLOBAL void vst1_p8(__transfersize(8) poly8_t * ptr, poly8x8_t val); // VST1.8 {d0}, [r0]
@@ -16425,6 +16483,16 @@ _NEON2SSE_INLINE uint16x8_t vzip1q_u16(uint16x8_t a, uint16x8_t b)
 _NEON2SSE_INLINE uint16x8_t vzip2q_u16(uint16x8_t a, uint16x8_t b)
 {
     return _mm_unpackhi_epi16(a, b);
+}
+
+_NEON2SSE_INLINE float32x4_t vzip1q_f32(float32x4_t a, float32x4_t b)
+{
+    return _mm_unpacklo_ps(a, b);
+}
+
+_NEON2SSE_INLINE float32x4_t vzip2q_f32(float32x4_t a, float32x4_t b)
+{
+    return _mm_unpackhi_ps(a, b);
 }
 
 _NEON2SSE_GLOBAL uint32x4x2_t vzipq_u32(uint32x4_t a, uint32x4_t b); // VZIP.32 q0,q0
