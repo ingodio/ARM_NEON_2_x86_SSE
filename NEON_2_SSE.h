@@ -191,8 +191,17 @@ typedef __m64_128 poly16x4_t;
 typedef __m64_128 float32x2_t;
 typedef __m128 float32x4_t;
 
-typedef __m128 float16x4_t; //not supported by IA, for compartibility
-typedef __m128 float16x8_t; //not supported by IA, for compartibility
+//typedef __m128 float16x4_t; //not supported by IA, for compartibility
+
+typedef struct {
+    __m128i val;
+} float16x4_t;
+
+typedef struct {
+    __m128 val[2];
+} float16x8_t;
+
+//typedef __m128 float16x8_t; //not supported by IA, for compartibility
 
 typedef __m64_128 float64x1_t;
 typedef __m128d float64x2_t;
@@ -1259,7 +1268,7 @@ _NEON2SSE_GLOBAL int8x16_t vld1q_s8(__transfersize(16) int8_t const * ptr); // V
 _NEON2SSE_GLOBAL int16x8_t vld1q_s16(__transfersize(8) int16_t const * ptr); // VLD1.16 {d0, d1}, [r0]
 _NEON2SSE_GLOBAL int32x4_t vld1q_s32(__transfersize(4) int32_t const * ptr); // VLD1.32 {d0, d1}, [r0]
 _NEON2SSE_GLOBAL int64x2_t vld1q_s64(__transfersize(2) int64_t const * ptr); // VLD1.64 {d0, d1}, [r0]
-_NEON2SSE_GLOBAL float16x8_t vld1q_f16(__transfersize(8) __fp16 const * ptr); // VLD1.16 {d0, d1}, [r0]
+//_NEON2SSE_GLOBAL float16x8_t vld1q_f16(__transfersize(8) __fp16 const * ptr); // VLD1.16 {d0, d1}, [r0]
 _NEON2SSE_GLOBAL float32x4_t vld1q_f32(__transfersize(4) float32_t const * ptr); // VLD1.32 {d0, d1}, [r0]
 _NEON2SSE_GLOBAL poly8x16_t vld1q_p8(__transfersize(16) poly8_t const * ptr); // VLD1.8 {d0, d1}, [r0]
 _NEON2SSE_GLOBAL poly16x8_t vld1q_p16(__transfersize(8) poly16_t const * ptr); // VLD1.16 {d0, d1}, [r0]
@@ -1338,7 +1347,7 @@ _NEON2SSE_GLOBAL void vst1q_s8(__transfersize(16) int8_t * ptr, int8x16_t val); 
 _NEON2SSE_GLOBAL void vst1q_s16(__transfersize(8) int16_t * ptr, int16x8_t val); // VST1.16 {d0, d1}, [r0]
 _NEON2SSE_GLOBAL void vst1q_s32(__transfersize(4) int32_t * ptr, int32x4_t val); // VST1.32 {d0, d1}, [r0]
 _NEON2SSE_GLOBAL void vst1q_s64(__transfersize(2) int64_t * ptr, int64x2_t val); // VST1.64 {d0, d1}, [r0]
-_NEON2SSE_GLOBAL void vst1q_f16(__transfersize(8) __fp16 * ptr, float16x8_t val); // VST1.16 {d0, d1}, [r0]
+//_NEON2SSE_GLOBAL void vst1q_f16(__transfersize(8) __fp16 * ptr, float16x8_t val); // VST1.16 {d0, d1}, [r0]
 _NEON2SSE_GLOBAL void vst1q_f32(__transfersize(4) float32_t * ptr, float32x4_t val); // VST1.32 {d0, d1}, [r0]
 _NEON2SSE_GLOBAL void vst1q_p8(__transfersize(16) poly8_t * ptr, poly8x16_t val); // VST1.8 {d0, d1}, [r0]
 _NEON2SSE_GLOBAL void vst1q_p16(__transfersize(8) poly16_t * ptr, poly16x8_t val); // VST1.16 {d0, d1}, [r0]
@@ -3647,8 +3656,8 @@ _NEON2SSE_INLINE int8x16_t vmulq_s8(int8x16_t a, int8x16_t b) // VMUL.I8 q0,q0,q
 {
     // no 8 bit simd multiply, need to go to 16 bits
 //solution may be not optimal
-    __m128i r16_1, r16_2;
 #ifdef USE_AVX2
+    __m128i r16_1, r16_2;
     __m256i a16, b16, r16;
     a16 = _mm256_cvtepi8_epi16(a);
     b16 = _mm256_cvtepi8_epi16(b);
@@ -3656,22 +3665,30 @@ _NEON2SSE_INLINE int8x16_t vmulq_s8(int8x16_t a, int8x16_t b) // VMUL.I8 q0,q0,q
     r16 = _mm256_shuffle_epi8(r16, *(__m256i*)mask8_16_even_odd); //return to 8 bit
     r16_1 = _mm256_castsi256_si128(r16);
     r16_2 = _mm256_extractf128_si256(r16, 1);
-#else
-    __m128i a16, b16;
-    a16 = _MM_CVTEPI8_EPI16(a); // SSE 4.1
-    b16 = _MM_CVTEPI8_EPI16(b); // SSE 4.1
-    r16_1 = _mm_mullo_epi16(a16, b16);
-    //swap hi and low part of a and b to process the remaining data
-    a16 = _mm_shuffle_epi32(a, _SWAP_HI_LOW32);
-    b16 = _mm_shuffle_epi32(b, _SWAP_HI_LOW32);
-    a16 = _MM_CVTEPI8_EPI16(a16); // SSE 4.1
-    b16 = _MM_CVTEPI8_EPI16(b16); // SSE 4.1  __m128i r16_2
-
-    r16_2 = _mm_mullo_epi16(a16, b16);
-    r16_1 = _mm_shuffle_epi8(r16_1, *(__m128i*)mask8_16_even_odd); //return to 8 bit
-    r16_2 = _mm_shuffle_epi8(r16_2, *(__m128i*)mask8_16_even_odd); //return to 8 bit
-#endif
     return _mm_unpacklo_epi64(r16_1, r16_2);
+#else
+    const __m128i zero = _mm_setzero_si128();
+
+    // Sign-extend low 8 bytes.
+    __m128i alo = _mm_cvtepi8_epi16(a);
+    __m128i blo = _mm_cvtepi8_epi16(b);
+
+    // Sign-extend high 8 bytes.
+    __m128i ahi = _mm_cvtepi8_epi16(_mm_srli_si128(a, 8));
+    __m128i bhi = _mm_cvtepi8_epi16(_mm_srli_si128(b, 8));
+
+    // Multiply.
+    __m128i lo = _mm_mullo_epi16(alo, blo);
+    __m128i hi = _mm_mullo_epi16(ahi, bhi);
+
+    // Pack low bytes back into 16 bytes.
+    const __m128i mask = _mm_set1_epi16(0x00FF);
+
+    lo = _mm_and_si128(lo, mask);
+    hi = _mm_and_si128(hi, mask);
+
+    return _mm_packus_epi16(lo, hi);
+#endif
 }
 
 _NEON2SSE_GLOBAL int16x8_t   vmulq_s16(int16x8_t a, int16x8_t b); // VMUL.I16 q0,q0,q0
@@ -9457,18 +9474,49 @@ _NEON2SSE_GLOBAL int32x4_t vld1q_s32(__transfersize(4) int32_t const * ptr); // 
 _NEON2SSE_GLOBAL int64x2_t vld1q_s64(__transfersize(2) int64_t const * ptr); // VLD1.64 {d0, d1}, [r0]
 #define vld1q_s64 LOAD_SI128
 
-_NEON2SSE_GLOBAL float16x8_t vld1q_f16(__transfersize(8) __fp16 const * ptr); // VLD1.16 {d0, d1}, [r0]
+//_NEON2SSE_GLOBAL float16x8_t vld1q_f16(__transfersize(8) __fp16 const * ptr);// VLD1.16 {d0, d1}, [r0]
 // IA32 SIMD doesn't work with 16bit floats currently, so need to go to 32 bit and then work with two 128bit registers
-/* _NEON2SSE_INLINE float16x8_t vld1q_f16(__transfersize(8) __fp16 const * ptr)// VLD1.16 {d0, d1}, [r0]
-{__m128 f1 = _mm_set_ps (ptr[3], ptr[2], ptr[1], ptr[0]);
-__m128 f2;
-f2 = _mm_set_ps (ptr[7], ptr[6], ptr[5], ptr[4]);
-}*/
+_NEON2SSE_INLINE float16x8_t vld1q_f16(__transfersize(8) __fp16 const * ptr)// VLD1.16 {d0, d1}, [r0]
+{
+    float16x8_t result;
+    result.val[0] = _mm_set_ps(
+        (float)ptr[3],
+        (float)ptr[2],
+        (float)ptr[1],
+        (float)ptr[0]
+    );
+    result.val[1] = _mm_set_ps(
+        (float)ptr[7],
+        (float)ptr[6],
+        (float)ptr[5],
+        (float)ptr[4]
+    );
+    return result;
+}
+
+//_NEON2SSE_GLOBAL float16x8_t vdupq_n_f16(float value);
+_NEON2SSE_INLINE float16x8_t vdupq_n_f16(float value)
+{
+    float16x8_t result;
+
+    result.val[0] = _mm_set1_ps((float)value);
+    result.val[1] = _mm_set1_ps((float)value);
+
+    return result;
+}
 
 //We assume ptr is NOT aligned in general case and use  _mm_loadu_ps
 // As tested in 2026 even for older IA CPUs unaligned data load  for aligned data is faster than doing alignment check 
 _NEON2SSE_GLOBAL float32x4_t vld1q_f32(__transfersize(4) float32_t const * ptr); // VLD1.32 {d0, d1}, [r0]
 #define vld1q_f32 _mm_loadu_ps
+
+_NEON2SSE_INLINE float32x4x2_t vld1q_f32_x2(const float *ptr)
+{
+    float32x4x2_t result;
+    result.val[0] = _mm_loadu_ps(ptr);
+    result.val[1] = _mm_loadu_ps(ptr + 4);
+    return result;
+}
 
 _NEON2SSE_GLOBAL poly8x16_t vld1q_p8(__transfersize(16) poly8_t const * ptr); // VLD1.8 {d0, d1}, [r0]
 #define vld1q_p8  LOAD_SI128
@@ -9478,6 +9526,13 @@ _NEON2SSE_GLOBAL poly16x8_t vld1q_p16(__transfersize(8) poly16_t const * ptr); /
 
 _NEON2SSE_GLOBAL uint8x8_t vld1_u8(__transfersize(8) uint8_t const * ptr); // VLD1.8 {d0}, [r0]
 #define vld1_u8(ptr)  *((__m64_128*)(ptr)) //was _mm_loadl_epi64((__m128i*)(ptr))
+
+//static inline __m128i vld1_u8(const void* ptr)
+//{
+//    __m128i result;
+//    memcpy(&result, ptr, 8);
+//    return result;
+//}
 
 _NEON2SSE_GLOBAL uint16x4_t vld1_u16(__transfersize(4) uint16_t const * ptr); // VLD1.16 {d0}, [r0]
 #define vld1_u16 vld1_u8
@@ -9491,6 +9546,23 @@ _NEON2SSE_GLOBAL uint64x1_t vld1_u64(__transfersize(1) uint64_t const * ptr); //
 
 _NEON2SSE_GLOBAL int8x8_t vld1_s8(__transfersize(8) int8_t const * ptr); // VLD1.8 {d0}, [r0]
 #define vld1_s8 vld1_u8
+
+_NEON2SSE_INLINE int8x8x2_t vld1_s8_x2(const int8_t *ptr)
+{
+    int8x8x2_t result;
+    result.val[0] = *reinterpret_cast<const __m64_128 *>(ptr);
+    result.val[1] = *reinterpret_cast<const __m64_128 *>(ptr + 8);
+    return result;
+}
+// int8x8_t → __m64_128
+// int8x16_t → __m128i
+//_NEON2SSE_INLINE int8x8x2_t vld1_s8_x2(const int8_t *ptr)
+//{
+//    int8x8x2_t result;
+//    result.val[0] = _mm_loadl_epi64((const __m128i *)ptr);
+//    result.val[1] = _mm_loadl_epi64((const __m128i *)(ptr + 8));
+//    return result;
+//
 
 _NEON2SSE_GLOBAL int16x4_t vld1_s16(__transfersize(4) int16_t const * ptr); // VLD1.16 {d0}, [r0]
 #define vld1_s16 vld1_u16
@@ -9800,7 +9872,182 @@ _NEON2SSE_GLOBAL void vst1q_s32(__transfersize(4) int32_t * ptr, int32x4_t val);
 _NEON2SSE_GLOBAL void vst1q_s64(__transfersize(2) int64_t * ptr, int64x2_t val); // VST1.64 {d0, d1}, [r0]
 #define vst1q_s64 STORE_SI128
 
-_NEON2SSE_GLOBAL void vst1q_f16(__transfersize(8) __fp16 * ptr, float16x8_t val); // VST1.16 {d0, d1}, [r0]
+
+_NEON2SSE_INLINE float vgetq_lane_f16(float16x8_t a, const int lane)
+{
+    __m128 v = (lane < 4) ? a.val[0] : a.val[1];
+    switch (lane & 3)
+    {
+        case 0: return _mm_cvtss_f32(v);
+        case 1: return _mm_cvtss_f32(_mm_shuffle_ps(v, v, _MM_SHUFFLE(1, 1, 1, 1)));
+        case 2: return _mm_cvtss_f32(_mm_shuffle_ps(v, v, _MM_SHUFFLE(2, 2, 2, 2)));
+        default: return _mm_cvtss_f32(_mm_shuffle_ps(v, v, _MM_SHUFFLE(3, 3, 3, 3)));
+    }
+}
+
+_NEON2SSE_INLINE float16x8_t vaddq_f16(float16x8_t a, float16x8_t b)
+{
+    float16x8_t result;
+
+    result.val[0] = _mm_add_ps(a.val[0], b.val[0]);
+    result.val[1] = _mm_add_ps(a.val[1], b.val[1]);
+
+    return result;
+}
+
+_NEON2SSE_INLINE float16x8_t vmulq_f16(float16x8_t a, float16x8_t b)
+{
+    float16x8_t result;
+
+    result.val[0] = _mm_mul_ps(a.val[0], b.val[0]);
+    result.val[1] = _mm_mul_ps(a.val[1], b.val[1]);
+
+    return result;
+}
+
+_NEON2SSE_INLINE void vst1q_f16(__transfersize(8) __fp16 * ptr, float16x8_t a)
+{
+    float temp[8];
+    _mm_storeu_ps(&temp[0], a.val[0]);
+    _mm_storeu_ps(&temp[4], a.val[1]);
+    for (int i = 0; i < 8; i++)
+    {
+        ptr[i] = (__fp16)temp[i];
+    }
+}
+
+_NEON2SSE_INLINE float16x8_t vsubq_f16(float16x8_t a, float16x8_t b)
+{
+    float16x8_t result;
+
+    result.val[0] = _mm_sub_ps(a.val[0], b.val[0]);
+    result.val[1] = _mm_sub_ps(a.val[1], b.val[1]);
+
+    return result;
+}
+
+_NEON2SSE_INLINE float16x8_t vfmaq_f16(float16x8_t a, float16x8_t b, float16x8_t c)
+{
+    float16x8_t result;
+
+    result.val[0] = _mm_add_ps(a.val[0], _mm_mul_ps(b.val[0], c.val[0]));
+    result.val[1] = _mm_add_ps(a.val[1], _mm_mul_ps(b.val[1], c.val[1]));
+
+    return result;
+}
+
+_NEON2SSE_INLINE float vmaxvq_f16(float16x8_t a)
+{
+    __m128 max = _mm_max_ps(a.val[0], a.val[1]);
+    max = _mm_max_ps(max, _mm_movehl_ps(max, max));
+    __m128 temp = _mm_shuffle_ps(max, max, _MM_SHUFFLE(1, 1, 1, 1));
+    max = _mm_max_ss(max, temp);
+    return _mm_cvtss_f32(max);
+}
+
+_NEON2SSE_INLINE float16x4_t vadd_f16(float16x4_t a, float16x4_t b)
+{
+    float16x4_t result;
+    result.val = _mm_add_ps(a.val, b.val);
+    return result;
+//    return _mm_add_ps(a, b);
+}
+
+_NEON2SSE_INLINE float16x8_t vmaxq_f16(float16x8_t a, float16x8_t b)
+{
+    float16x8_t result;
+    result.val[0] = _mm_max_ps(a.val[0], b.val[0]);
+    result.val[1] = _mm_max_ps(a.val[1], b.val[1]);
+    return result;
+}
+
+_NEON2SSE_INLINE float16x8_t vfmaq_lane_f16(
+    float16x8_t a,
+    float16x8_t b,
+    float16x4_t v,
+    const int lane)
+{
+    float16x8_t result;
+    __m128 scalar;
+
+    switch (lane)
+    {
+        case 0: scalar = _mm_shuffle_ps(v.val, v.val, _MM_SHUFFLE(0, 0, 0, 0)); break;
+        case 1: scalar = _mm_shuffle_ps(v.val, v.val, _MM_SHUFFLE(1, 1, 1, 1)); break;
+        case 2: scalar = _mm_shuffle_ps(v.val, v.val, _MM_SHUFFLE(2, 2, 2, 2)); break;
+        default: scalar = _mm_shuffle_ps(v.val, v.val, _MM_SHUFFLE(3, 3, 3, 3)); break;
+    }
+    result.val[0] = _mm_add_ps(a.val[0], _mm_mul_ps(b.val[0], scalar));
+    result.val[1] = _mm_add_ps(a.val[1], _mm_mul_ps(b.val[1], scalar));
+    return result;
+}
+
+
+_NEON2SSE_INLINE float16x8_t vcvtq_f16_s16(int16x8_t a)
+{
+    float16x8_t result;
+
+    result.val[0] = _mm_cvtepi32_ps(_mm_cvtepi16_epi32(a));
+    result.val[1] = _mm_cvtepi32_ps(_mm_cvtepi16_epi32(_mm_srli_si128(a, 8)));
+
+    return result;
+}
+
+
+_NEON2SSE_INLINE float16x8_t vcvtq_f16_u16(uint16x8_t a)
+{
+    float16x8_t result;
+    result.val[0] = _mm_cvtepi32_ps(_mm_cvtepu16_epi32(a));
+    result.val[1] = _mm_cvtepi32_ps(
+        _mm_cvtepu16_epi32(_mm_srli_si128(a, 8))
+    );
+    return result;
+}
+
+static inline __m128 v_tanh(__m128 x)
+{
+    alignas(16) float values[4];
+    _mm_store_ps(values, x);
+
+    for (int i = 0; i < 4; ++i) {
+//tanh is slow
+        values[i] = std::tanh(values[i]);
+    }
+
+    return _mm_load_ps(values);
+}
+
+_NEON2SSE_INLINE float32x4_t v_expf(float32x4_t x)
+{
+    alignas(16) float values[4];
+    _mm_store_ps(values, x);
+
+    for (int i = 0; i < 4; ++i) {
+        values[i] = std::exp(values[i]);
+    }
+
+    return _mm_load_ps(values);
+}
+
+_NEON2SSE_INLINE float vmaxvq_f32(float32x4_t a)
+{
+    __m128 t = _mm_max_ps(a, _mm_movehl_ps(a, a));
+    t = _mm_max_ss(t, _mm_shuffle_ps(t, t, _MM_SHUFFLE(1, 1, 1, 1)));
+    return _mm_cvtss_f32(t);
+}
+
+_NEON2SSE_INLINE uint16x8_t vceqq_f16(float16x8_t a, float16x8_t b)
+{
+    __m128i lo = _mm_castps_si128(_mm_cmpeq_ps(a.val[0], b.val[0]));
+    __m128i hi = _mm_castps_si128(_mm_cmpeq_ps(a.val[1], b.val[1]));
+
+    // Convert 4 x 32-bit masks into 4 x 16-bit masks.
+    lo = _mm_packs_epi32(lo, hi);
+
+    return lo;
+}
+
+//_NEON2SSE_GLOBAL void vst1q_f16(__transfersize(8) __fp16 * ptr, float16x8_t val); // VST1.16 {d0, d1}, [r0]
 // IA32 SIMD doesn't work with 16bit floats currently
 
 //We assume ptr is NOT aligned in general case and use  _mm_storeu_ps
@@ -9991,6 +10238,55 @@ _NEON2SSE_INLINE uint8x16x2_t vld1q_u8_x2(__transfersize(32) uint8_t const * ptr
     v.val[0] = vld1q_u8(ptr);
     v.val[1] = vld1q_u8(ptr + 16);
     return v;
+}
+
+_NEON2SSESTORAGE uint8x16x4_t vld1q_u8_x4(__transfersize(64) uint8_t const * ptr);
+_NEON2SSE_INLINE uint8x16x4_t vld1q_u8_x4(__transfersize(64) uint8_t const * ptr)
+{
+    uint8x16x4_t v;
+
+    v.val[0] = vld1q_u8(ptr);
+    v.val[1] = vld1q_u8(ptr + 16);
+    v.val[2] = vld1q_u8(ptr + 32);
+    v.val[3] = vld1q_u8(ptr + 48);
+
+    return v;
+}
+
+_NEON2SSESTORAGE uint8x16_t vqtbl1q_u8(uint8x16_t a, uint8x16_t idx);
+_NEON2SSE_INLINE uint8x16_t vqtbl1q_u8(uint8x16_t a, uint8x16_t idx)
+{
+    // PSHUFB returns zero when the index's high bit is set.
+    return _mm_shuffle_epi8(a, idx);
+}
+_NEON2SSESTORAGE int8x16_t vqtbl1q_s8(__transfersize(16) int8x16_t a, __transfersize(16) uint8x16_t idx);
+_NEON2SSE_INLINE int8x16_t vqtbl1q_s8(__transfersize(16) int8x16_t a, __transfersize(16) uint8x16_t idx)
+{
+    return _mm_shuffle_epi8(a, idx);
+}
+
+template<int Lane>
+_NEON2SSE_INLINE int32x4_t vdotq_laneq_s32_impl(int32x4_t acc, int8x16_t a, int8x16_t b);
+template<int Lane>
+_NEON2SSE_INLINE int32x4_t vdotq_laneq_s32_impl(
+    int32x4_t acc,
+    int8x16_t a,
+    int8x16_t b)
+{
+    static_assert(Lane >= 0 && Lane < 4, "Invalid lane");
+    const __m128i zero = _mm_setzero_si128();
+    const __m128i bl = _mm_shuffle_epi32(
+        b, _MM_SHUFFLE(Lane, Lane, Lane, Lane));
+    const __m128i asign = _mm_cmpgt_epi8(zero, a);
+    const __m128i bsign = _mm_cmpgt_epi8(zero, bl);
+    const __m128i alo = _mm_unpacklo_epi8(a, asign);
+    const __m128i ahi = _mm_unpackhi_epi8(a, asign);
+    const __m128i blo = _mm_unpacklo_epi8(bl, bsign);
+    const __m128i bhi = _mm_unpackhi_epi8(bl, bsign);
+    const __m128i lo = _mm_madd_epi16(alo, blo);
+    const __m128i hi = _mm_madd_epi16(ahi, bhi);
+    const __m128i dot = _mm_hadd_epi32(lo, hi);
+    return _mm_add_epi32(acc, dot);
 }
 //****************** 2 elements load  *********************************************
 _NEON2SSESTORAGE uint8x16x2_t vld2q_u8(__transfersize(32) uint8_t const * ptr); // VLD2.8 {d0, d2}, [r0]
@@ -16115,6 +16411,16 @@ _NEON2SSE_GLOBAL uint8x16x2_t vzipq_u8(uint8x16_t a, uint8x16_t b); // VZIP.8 q0
 
 _NEON2SSE_GLOBAL uint16x8x2_t vzipq_u16(uint16x8_t a, uint16x8_t b); // VZIP.16 q0,q0
 #define vzipq_u16 vzipq_s16
+
+_NEON2SSE_INLINE uint16x8_t vzip1q_u16(uint16x8_t a, uint16x8_t b)
+{
+    return _mm_unpacklo_epi16(a, b);
+}
+
+_NEON2SSE_INLINE uint16x8_t vzip2q_u16(uint16x8_t a, uint16x8_t b)
+{
+    return _mm_unpackhi_epi16(a, b);
+}
 
 _NEON2SSE_GLOBAL uint32x4x2_t vzipq_u32(uint32x4_t a, uint32x4_t b); // VZIP.32 q0,q0
 #define vzipq_u32 vzipq_s32
