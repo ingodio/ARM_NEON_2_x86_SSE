@@ -10402,6 +10402,32 @@ _NEON2SSE_INLINE int8x16_t vqtbl1q_s8(__transfersize(16) int8x16_t a, __transfer
     return _mm_shuffle_epi8(a, idx);
 }
 
+
+_NEON2SSE_INLINE int8x8_t vqtbl1_s8(
+    const int8x16_t& a,
+    const uint8x8_t& b)
+{
+    __m128i indices = _mm_loadl_epi64(
+        reinterpret_cast<const __m128i*>(&b));
+
+    // Perform byte lookup
+    __m128i result = _mm_shuffle_epi8(a, indices);
+
+    // Valid indices must be in range [0, 15]
+    __m128i valid = _mm_cmpeq_epi8(
+        _mm_and_si128(indices, _mm_set1_epi8((char)0xF0)),
+        _mm_setzero_si128());
+
+    result = _mm_and_si128(result, valid);
+
+    int8x8_t output;
+    _mm_storel_epi64(
+        reinterpret_cast<__m128i*>(&output), result);
+
+    return output;
+}
+
+
 template<int Lane>
 _NEON2SSE_INLINE int32x4_t vdotq_laneq_s32_impl(int32x4_t acc, int8x16_t a, int8x16_t b);
 template<int Lane>
@@ -16844,6 +16870,57 @@ _NEON2SSE_GLOBAL poly16x8_t vreinterpretq_p16_p8 (poly8x16_t t);
 #define vreinterpretq_p16_p8  vreinterpretq_s16_p8
 
 //****  Integer to float  ******
+#include <fp16/fp16.h>
+
+//        values[i] = fp16_ieee_from_fp32_value(a.val[0].m128_f32[i]);
+//        values[i + 4] = fp16_ieee_from_fp32_value(a.val[1].m128_f32[i]);
+//        values[i] = fp16_ieee_from_fp32_value(a.val[0][i]);
+//        values[i + 4] = fp16_ieee_from_fp32_value(a.val[1][i]);
+
+_NEON2SSE_INLINE uint16x8_t vreinterpretq_u16_f16(
+    const float16x8_t& a)
+{
+    uint16_t values[8];
+
+    for (int i = 0; i < 4; ++i)
+    {
+        values[i] = fp16_ieee_from_fp32_value(a.val[0][i]);
+        values[i + 4] = fp16_ieee_from_fp32_value(a.val[1][i]);
+    }
+
+    return _mm_loadu_si128(
+        reinterpret_cast<const __m128i*>(values));
+}
+
+
+_NEON2SSE_INLINE float16x8_t vreinterpretq_f16_u16(
+    const uint16x8_t& a)
+{
+    float16x8_t result;
+
+    uint16_t values[8];
+
+    _mm_storeu_si128(
+        reinterpret_cast<__m128i*>(values), a);
+
+    result.val[0] = _mm_set_ps(
+        fp16_ieee_to_fp32_value(values[3]),
+        fp16_ieee_to_fp32_value(values[2]),
+        fp16_ieee_to_fp32_value(values[1]),
+        fp16_ieee_to_fp32_value(values[0])
+    );
+
+    result.val[1] = _mm_set_ps(
+        fp16_ieee_to_fp32_value(values[7]),
+        fp16_ieee_to_fp32_value(values[6]),
+        fp16_ieee_to_fp32_value(values[5]),
+        fp16_ieee_to_fp32_value(values[4])
+    );
+
+    return result;
+}
+
+//****  Integer to float  ******
 _NEON2SSESTORAGE float32x2_t vreinterpret_f32_u32 (uint32x2_t t);
 _NEON2SSE_INLINE float32x2_t vreinterpret_f32_u32 (uint32x2_t t)
 {
@@ -17638,4 +17715,4 @@ _NEON2SSE_INLINE int64x2_t vtrn2q_s64(int64x2_t a, int64x2_t b)
 #endif
 #endif
 
-#endif /* NEON2SSE_H */
+#endif /* NEON2SSE_H *
