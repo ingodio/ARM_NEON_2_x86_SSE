@@ -6348,7 +6348,7 @@ _NEON2SSE_INLINE int8x8_t vpadd_s8(int8x8_t a, int8x8_t b) // VPADD.I8 d0,d0,d0
     __m128i a16, b16, res;
     a16 = _MM_CVTEPI8_EPI16 (_pM128i(a)); // SSE 4.1
     b16 = _MM_CVTEPI8_EPI16 (_pM128i(b)); // SSE 4.1
-    res = _mm_hadd_epi16 (a16, b16);
+    res = _mm_hadd_epi16(a16, b16);
     res = _mm_shuffle_epi8 (res, *(__m128i*) mask8_16_even_odd); //return to 8 bit, use low 64 bits
     return64(res);
 }
@@ -6358,7 +6358,7 @@ _NEON2SSE_INLINE int16x4_t   vpadd_s16(int16x4_t a, int16x4_t b)
 {
     int16x4_t res64;
     __m128i hadd128;
-    hadd128 = _mm_hadd_epi16 (_pM128i(a), _pM128i(b));
+    hadd128 = _mm_hadd_epi16(_pM128i(a), _pM128i(b));
     hadd128 = _mm_shuffle_epi32 (hadd128, 0 | (2 << 2) | (1 << 4) | (3 << 6));
     return64(hadd128);
 }
@@ -6374,6 +6374,11 @@ _NEON2SSE_INLINE int32x2_t   vpadd_s32(int32x2_t a, int32x2_t b)
     return64(hadd128);
 }
 
+_NEON2SSESTORAGE int32x4_t vpaddq_s32(int32x4_t a, int32x4_t b);
+_NEON2SSE_INLINE int32x4_t vpaddq_s32(int32x4_t a, int32x4_t b)
+{
+    return _mm_hadd_epi32(a, b);
+}
 
 _NEON2SSESTORAGE uint8x8_t vpadd_u8(uint8x8_t a, uint8x8_t b); // VPADD.I8 d0,d0,d0
 _NEON2SSE_INLINE uint8x8_t vpadd_u8(uint8x8_t a, uint8x8_t b) // VPADD.I8 d0,d0,d0
@@ -6385,7 +6390,7 @@ _NEON2SSE_INLINE uint8x8_t vpadd_u8(uint8x8_t a, uint8x8_t b) // VPADD.I8 d0,d0,
     mask8 = _mm_set1_epi16(0xff);
     a16 = _MM_CVTEPU8_EPI16 (_pM128i(a)); // SSE 4.1
     b16 = _MM_CVTEPU8_EPI16 (_pM128i(b)); // SSE 4.1
-    res = _mm_hadd_epi16 (a16, b16);
+    res = _mm_hadd_epi16(a16, b16);
     res = _mm_and_si128(res, mask8); //to avoid saturation
     res = _mm_packus_epi16 (res,res); //use low 64 bits
     return64(res);
@@ -6402,7 +6407,7 @@ _NEON2SSE_INLINE uint16x4_t vpadd_u16(uint16x4_t a, uint16x4_t b) // VPADD.I16 d
     cfffe = _mm_set1_epi16 (-2); //(int16_t)0xfffe
     as = _mm_sub_epi16 (_pM128i(a), c32767);
     bs = _mm_sub_epi16 (_pM128i(b), c32767);
-    res = _mm_hadd_epi16 (as, bs);
+    res = _mm_hadd_epi16(as, bs);
     res = _mm_add_epi16 (res, cfffe);
     res = _mm_shuffle_epi32 (res, 0 | (2 << 2) | (1 << 4) | (3 << 6));
     return64(res);
@@ -6445,7 +6450,7 @@ _NEON2SSE_INLINE int16x4_t vpaddl_s8(int8x8_t a) // VPADDL.S8 d0,d0
     __m128i a16;
     int16x4_t res64;
     a16 = _MM_CVTEPI8_EPI16 (_pM128i(a)); // SSE 4.1
-    a16 = _mm_hadd_epi16 (a16,  a16); //use low 64 bits
+    a16 = _mm_hadd_epi16(a16,  a16); //use low 64 bits
     return64(a16);
 }
 
@@ -6476,7 +6481,7 @@ _NEON2SSE_INLINE uint16x4_t vpaddl_u8(uint8x8_t a) // VPADDL.U8 d0,d0
     uint16x4_t res64;
     __m128i a16;
     a16 = _MM_CVTEPU8_EPI16 (_pM128i(a)); // SSE 4.1 use low 64 bits
-    a16 = _mm_hadd_epi16 (a16, a16); //use low 64 bits
+    a16 = _mm_hadd_epi16(a16, a16); //use low 64 bits
     return64(a16);
 }
 
@@ -6507,19 +6512,35 @@ _NEON2SSE_INLINE int16x8_t vpaddlq_s8(int8x16_t a) // VPADDL.S8 q0,q0
     //swap hi and low part of r to process the remaining data
     r16_2 = _mm_shuffle_epi32 (a, _SWAP_HI_LOW32);
     r16_2 = _MM_CVTEPI8_EPI16 (r16_2);
-    return _mm_hadd_epi16 (r16_1, r16_2);
+    return _mm_hadd_epi16(r16_1, r16_2);
 }
 
 _NEON2SSESTORAGE int32x4_t vpaddlq_s16(int16x8_t a); // VPADDL.S16 q0,q0
 _NEON2SSE_INLINE int32x4_t vpaddlq_s16(int16x8_t a) // VPADDL.S16 q0,q0
 {
-    //no 8 bit hadd in IA32, need to go to 16 bit
+//    //no 8 bit hadd in IA32, need to go to 16 bit
     __m128i r32_1, r32_2;
     r32_1 = _MM_CVTEPI16_EPI32(a);
     //swap hi and low part of r to process the remaining data
     r32_2 = _mm_shuffle_epi32 (a, _SWAP_HI_LOW32);
     r32_2 = _MM_CVTEPI16_EPI32 (r32_2);
     return _mm_hadd_epi32 (r32_1, r32_2);
+}
+
+_NEON2SSESTORAGE int32x4_t vdotq_s32(int32x4_t acc, int8x16_t a, int8x16_t b);
+_NEON2SSE_INLINE int32x4_t vdotq_s32(int32x4_t acc, int8x16_t a, int8x16_t b)
+{
+    const int16x8_t p0 =
+        vmull_s8(vget_low_s8(a), vget_low_s8(b));
+    const int16x8_t p1 =
+        vmull_s8(vget_high_s8(a), vget_high_s8(b));
+    return vaddq_s32(
+        acc,
+        vaddq_s32(
+            vpaddlq_s16(p0),
+            vpaddlq_s16(p1)
+        )
+    );
 }
 
 _NEON2SSESTORAGE int64x2_t vpaddlq_s32(int32x4_t a); // VPADDL.S32 q0,q0
@@ -9543,6 +9564,15 @@ _NEON2SSE_INLINE int8x16x4_t vld1q_s8_x4(const int8_t* ptr)
     return r;
 }
 
+_NEON2SSE_INLINE int16x8x2_t vld1q_s16_x2_compat(const int16_t* ptr)
+{
+    int16x8x2_t result;
+    result.val[0] = vld1q_s16(ptr);
+    result.val[1] = vld1q_s16(ptr + 8);
+    return result;
+}
+
+
 //We assume ptr is NOT aligned in general case and use  _mm_loadu_ps
 // As tested in 2026 even for older IA CPUs unaligned data load  for aligned data is faster than doing alignment check 
 _NEON2SSE_GLOBAL float32x4_t vld1q_f32(__transfersize(4) float32_t const * ptr); // VLD1.32 {d0, d1}, [r0]
@@ -9559,12 +9589,20 @@ _NEON2SSE_INLINE float32x4x2_t vld1q_f32_x2(const float *ptr)
 _NEON2SSE_INLINE float32x4x4_t vld1q_f32_x4(const float32_t* ptr)
 {
     float32x4x4_t r;
-
     r.val[0] = _mm_loadu_ps(ptr);
     r.val[1] = _mm_loadu_ps(ptr + 4);
     r.val[2] = _mm_loadu_ps(ptr + 8);
     r.val[3] = _mm_loadu_ps(ptr + 12);
+    return r;
+}
 
+_NEON2SSE_INLINE uint32x4x4_t vld1q_u32_x4(const uint32_t* ptr)
+{
+    uint32x4x4_t r;
+    r.val[0] = _mm_loadu_si128((const __m128i*)(ptr));
+    r.val[1] = _mm_loadu_si128((const __m128i*)(ptr + 4));
+    r.val[2] = _mm_loadu_si128((const __m128i*)(ptr + 8));
+    r.val[3] = _mm_loadu_si128((const __m128i*)(ptr + 12));
     return r;
 }
 
