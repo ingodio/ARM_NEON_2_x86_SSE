@@ -9564,7 +9564,7 @@ _NEON2SSE_INLINE int8x16x4_t vld1q_s8_x4(const int8_t* ptr)
     return r;
 }
 
-_NEON2SSE_INLINE int16x8x2_t vld1q_s16_x2_compat(const int16_t* ptr)
+_NEON2SSE_INLINE int16x8x2_t vld1q_s16_x2(const int16_t* ptr)
 {
     int16x8x2_t result;
     result.val[0] = vld1q_s16(ptr);
@@ -13793,37 +13793,41 @@ _NEON2SSE_INLINE uint32x2_t vqmovun_s64(int64x2_t a)
 //for Intel SIMD we need to set the MSB to 1 for zero return
 //if b is unsigned ( > max signed)  or negative it has MSB 1 set and doesn't need any special processing
 _NEON2SSESTORAGE uint8x8_t vtbl1_u8(uint8x8_t a, uint8x8_t b); // VTBL.8 d0, {d0}, d0
+//    uint8x8_t res64;
+//    __m128i c7, maskgt, bmask, b128;
+//    c7 = _mm_set1_epi8 (7);
+//    b128 = _pM128i(b);
+//    maskgt = _mm_cmpgt_epi8(b128,c7);
+//    bmask = _mm_or_si128(b128,maskgt);
+//    bmask = _mm_shuffle_epi8(_pM128i(a),bmask);
+//    return64(bmask);
 _NEON2SSE_INLINE uint8x8_t vtbl1_u8(uint8x8_t a, uint8x8_t b)
 {
     uint8x8_t res64;
-    __m128i c7, maskgt, bmask, b128;
-    c7 = _mm_set1_epi8 (7);
-    b128 = _pM128i(b);
-    maskgt = _mm_cmpgt_epi8(b128,c7);
-    bmask = _mm_or_si128(b128,maskgt);
-    bmask = _mm_shuffle_epi8(_pM128i(a),bmask);
-    return64(bmask);
+    __m128i index = _pM128i(b);
+    __m128i valid = _mm_cmpeq_epi8(
+        _mm_and_si128(index, _mm_set1_epi8((char)0xF8)),
+        _mm_setzero_si128()
+    );
+    __m128i result = _mm_shuffle_epi8(_pM128i(a), index);
+    return64(_mm_and_si128(result, valid));
 }
 
 _NEON2SSE_GLOBAL int8x8_t vtbl1_s8(int8x8_t a,  int8x8_t b); // VTBL.8 d0, {d0}, d0
 #define vtbl1_s8 vtbl1_u8
 
+_NEON2SSE_INLINE __m128i vtbl1_u8(__m128i table, __m128i index)
+{
+    __m128i shuffled = _mm_shuffle_epi8(table, index);
+    __m128i valid = _mm_cmpeq_epi8(
+        _mm_and_si128(index, _mm_set1_epi8((char)0xF8)),
+        _mm_setzero_si128()
+    );
+    return _mm_and_si128(shuffled, valid);
+}
+
 _NEON2SSE_GLOBAL poly8x8_t vtbl1_p8(poly8x8_t a, uint8x8_t b); // VTBL.8 d0, {d0}, d0
 #define vtbl1_p8 vtbl1_u8
-
-_NEON2SSESTORAGE uint8x8_t vtbl2_u8(uint8x8x2_t a, uint8x8_t b); // VTBL.8 d0, {d0, d1}, d0
-_NEON2SSE_INLINE uint8x8_t vtbl2_u8(uint8x8x2_t a, uint8x8_t b)
-{
-    uint8x8_t res64;
-    __m128i c15, a01, maskgt15, bmask, b128;
-    c15 = _mm_set1_epi8 (15);
-    b128 = _pM128i(b);
-    maskgt15 = _mm_cmpgt_epi8(b128,c15);
-    bmask = _mm_or_si128(b128, maskgt15);
-    a01 = _mm_unpacklo_epi64(_pM128i(a.val[0]), _pM128i(a.val[1]));
-    a01 =  _mm_shuffle_epi8(a01, bmask);
-    return64(a01);
-}
 
 //int8x8_t vtbl2_s8(int8x8x2_t a, int8x8_t b); // VTBL.8 d0, {d0, d1}, d0
 #define vtbl2_s8 vtbl2_u8
@@ -16690,6 +16694,18 @@ _NEON2SSE_GLOBAL uint16x8x2_t vuzpq_u16(uint16x8_t a, uint16x8_t b); // VUZP.16 
 
 _NEON2SSE_GLOBAL uint32x4x2_t vuzpq_u32(uint32x4_t a, uint32x4_t b); // VUZP.32 q0,q0
 #define vuzpq_u32 vuzpq_s32
+
+_NEON2SSESTORAGE __m128i vuzp1q_u32(__m128i a, __m128i b);
+_NEON2SSE_INLINE __m128i vuzp1q_u32(__m128i a, __m128i b)
+{
+    return _mm_castps_si128(
+        _mm_shuffle_ps(
+            _mm_castsi128_ps(a),
+            _mm_castsi128_ps(b),
+            _MM_SHUFFLE(2, 0, 2, 0)
+        )
+    );
+}
 
 _NEON2SSESTORAGE float32x4x2_t vuzpq_f32(float32x4_t a, float32x4_t b); // VUZP.32 q0,q0
 _NEON2SSE_INLINE float32x4x2_t vuzpq_f32(float32x4_t a, float32x4_t b) // VUZP.32 q0,q0
