@@ -9525,6 +9525,24 @@ _NEON2SSE_INLINE float16x8_t vdupq_n_f16(float value)
     return result;
 }
 
+_NEON2SSE_INLINE int8x16x2_t vld1q_s8_x2(const int8_t* ptr)
+{
+    int8x16x2_t r;
+    r.val[0] = _mm_loadu_si128((const __m128i*)(ptr));
+    r.val[1] = _mm_loadu_si128((const __m128i*)(ptr + 16));
+    return r;
+}
+
+_NEON2SSE_INLINE int8x16x4_t vld1q_s8_x4(const int8_t* ptr)
+{
+    int8x16x4_t r;
+    r.val[0] = _mm_loadu_si128((const __m128i*)(ptr +  0));
+    r.val[1] = _mm_loadu_si128((const __m128i*)(ptr + 16));
+    r.val[2] = _mm_loadu_si128((const __m128i*)(ptr + 32));
+    r.val[3] = _mm_loadu_si128((const __m128i*)(ptr + 48));
+    return r;
+}
+
 //We assume ptr is NOT aligned in general case and use  _mm_loadu_ps
 // As tested in 2026 even for older IA CPUs unaligned data load  for aligned data is faster than doing alignment check 
 _NEON2SSE_GLOBAL float32x4_t vld1q_f32(__transfersize(4) float32_t const * ptr); // VLD1.32 {d0, d1}, [r0]
@@ -9977,6 +9995,18 @@ _NEON2SSE_INLINE float vmaxvq_f16(float16x8_t a)
     return _mm_cvtss_f32(max);
 }
 
+_NEON2SSE_INLINE int16_t vmaxvq_s16(int16x8_t a)
+{
+    __m128i max = a;
+    // Reduce 8 x int16 to 4 x int16
+    max = _mm_max_epi16(max, _mm_shuffle_epi32(max, _MM_SHUFFLE(1, 0, 3, 2)));
+    // Reduce 4 x int16 to 2 x int16
+    max = _mm_max_epi16(max, _mm_shufflelo_epi16(max, _MM_SHUFFLE(1, 0, 3, 2)));
+    // Reduce 2 x int16 to 1 x int16
+    max = _mm_max_epi16(max, _mm_srli_si128(max, 2));
+    return (int16_t)_mm_extract_epi16(max, 0);
+}
+
 _NEON2SSE_INLINE uint16_t vmaxvq_u16(uint16x8_t a)
 {
     __m128i max = a;
@@ -10127,6 +10157,12 @@ _NEON2SSE_INLINE void vst1_u8(__transfersize(8) uint8_t * ptr, uint8x8_t val)
     }
     //_mm_storel_epi64((__m128i*)ptr, val);
     return;
+}
+
+_NEON2SSE_INLINE void vst1q_u8_x2(uint8_t* ptr, uint8x16x2_t a)
+{
+    _mm_storeu_si128((__m128i*)(ptr),      a.val[0]);
+    _mm_storeu_si128((__m128i*)(ptr + 16), a.val[1]);
 }
 
 _NEON2SSESTORAGE void vst1_u16(__transfersize(4) uint16_t * ptr, uint16x4_t val); // VST1.16 {d0}, [r0]
@@ -17510,6 +17546,16 @@ _NEON2SSE_INLINE float32x4_t vtrn2q_f32(float32x4_t a, float32x4_t b)
     __m128 ab_sh;
     ab_sh = _mm_shuffle_ps(a, b, _MM_SHUFFLE(3, 1, 3, 1)); //a1, a3, b1, b3
     return _mm_shuffle_ps(ab_sh, ab_sh, _MM_SHUFFLE(3, 1, 2, 0)); //a1, b1, a3, b3
+}
+
+_NEON2SSE_INLINE int64x2_t vtrn1q_s64(int64x2_t a, int64x2_t b)
+{
+    return _mm_unpacklo_epi64(a, b);
+}
+
+_NEON2SSE_INLINE int64x2_t vtrn2q_s64(int64x2_t a, int64x2_t b)
+{
+    return _mm_unpackhi_epi64(a, b);
 }
 
 // Define (overload) bitwise operators in C++ code for 128-bit SIMD types
