@@ -429,6 +429,7 @@ struct float16x8x3_t {
 
 typedef struct float32x4x3_t float32x4x3_t; //for C compilers to make them happy
 typedef struct float16x8x3_t float16x8x3_t; //for C compilers to make them happy
+#define return128(a) return (a);
 typedef struct float32x2x3_t float32x2x3_t; //for C compilers to make them happy
 typedef  float16x8x3_t float16x4x3_t;
 
@@ -3923,7 +3924,7 @@ _NEON2SSE_INLINE float32x2_t vmla_f32(float32x2_t a, float32x2_t b, float32x2_t 
 {
     __m128 res;
     __m64_128 res64;
-#ifdef USE_AVX2    
+#ifdef USE_AVX2
     //fma
     res = _mm_fmadd_ps(_pM128(c), _pM128(b), _pM128(a));
 #else
@@ -4151,7 +4152,7 @@ _NEON2SSE_INLINE int32x4_t vmlsq_s32(int32x4_t a, int32x4_t b, int32x4_t c) // V
 }
 
 _NEON2SSESTORAGE float32x4_t vmlsq_f32(float32x4_t a, float32x4_t b, float32x4_t c); // VMLS.F32 q0,q0,q0
-#ifdef USE_AVX2    
+#ifdef USE_AVX2
 //fma
 #define vmlsq_f32(a, b, c) _mm_fnmadd_ps(c, b, a) //swap arguments
 #else
@@ -10116,30 +10117,15 @@ _NEON2SSE_INLINE float16x8_t vcvtq_f16_u16(uint16x8_t a)
     return result;
 }
 
-static inline __m128 v_tanh(__m128 x)
-{
-    alignas(16) float values[4];
-    _mm_store_ps(values, x);
-
-    for (int i = 0; i < 4; ++i) {
-//tanh is slow
-        values[i] = std::tanh(values[i]);
-    }
-
-    return _mm_load_ps(values);
-}
-
-_NEON2SSE_INLINE float32x4_t v_expf(float32x4_t x)
-{
-    alignas(16) float values[4];
-    _mm_store_ps(values, x);
-
-    for (int i = 0; i < 4; ++i) {
-        values[i] = std::exp(values[i]);
-    }
-
-    return _mm_load_ps(values);
-}
+//_NEON2SSE_INLINE float32x4_t v_expf(float32x4_t x)
+//{
+//    alignas(16) float values[4];
+//    _mm_store_ps(values, x);
+//    for (int i = 0; i < 4; ++i) {
+//        values[i] = std::exp(values[i]);
+//    }
+//    return _mm_load_ps(values);
+//}
 
 _NEON2SSE_INLINE float vmaxvq_f32(float32x4_t a)
 {
@@ -10381,27 +10367,33 @@ _NEON2SSESTORAGE uint8x16x4_t vld1q_u8_x4(__transfersize(64) uint8_t const * ptr
 _NEON2SSE_INLINE uint8x16x4_t vld1q_u8_x4(__transfersize(64) uint8_t const * ptr)
 {
     uint8x16x4_t v;
-
     v.val[0] = vld1q_u8(ptr);
     v.val[1] = vld1q_u8(ptr + 16);
     v.val[2] = vld1q_u8(ptr + 32);
     v.val[3] = vld1q_u8(ptr + 48);
-
     return v;
 }
 
 _NEON2SSESTORAGE uint8x16_t vqtbl1q_u8(uint8x16_t a, uint8x16_t idx);
 _NEON2SSE_INLINE uint8x16_t vqtbl1q_u8(uint8x16_t a, uint8x16_t idx)
 {
-    // PSHUFB returns zero when the index's high bit is set.
-    return _mm_shuffle_epi8(a, idx);
-}
-_NEON2SSESTORAGE int8x16_t vqtbl1q_s8(__transfersize(16) int8x16_t a, __transfersize(16) uint8x16_t idx);
-_NEON2SSE_INLINE int8x16_t vqtbl1q_s8(__transfersize(16) int8x16_t a, __transfersize(16) uint8x16_t idx)
-{
-    return _mm_shuffle_epi8(a, idx);
+    __m128i index, valid, result;
+    index = _pM128i(idx);
+    valid = _mm_cmpgt_epi8(_mm_set1_epi8(16), index);
+    result = _mm_shuffle_epi8(_pM128i(a), index);
+    return128(_mm_and_si128(result, valid));
 }
 
+_NEON2SSESTORAGE int8x16_t vqtbl1q_s8(__transfersize(16) int8x16_t a, __transfersize(16) uint8x16_t idx);
+_NEON2SSE_INLINE int8x16_t vqtbl1q_s8(int8x16_t a, int8x16_t idx)
+{
+    int8x16_t res;
+    __m128i index, valid, result;
+    index = _pM128i(idx);
+    valid = _mm_cmpgt_epi8(_mm_set1_epi8(16), index);
+    result = _mm_shuffle_epi8(_pM128i(a), index);
+    return128(_mm_and_si128(result, valid));
+}
 
 _NEON2SSE_INLINE int8x8_t vqtbl1_s8(
     const int8x16_t& a,
@@ -10425,31 +10417,6 @@ _NEON2SSE_INLINE int8x8_t vqtbl1_s8(
         reinterpret_cast<__m128i*>(&output), result);
 
     return output;
-}
-
-
-template<int Lane>
-_NEON2SSE_INLINE int32x4_t vdotq_laneq_s32_impl(int32x4_t acc, int8x16_t a, int8x16_t b);
-template<int Lane>
-_NEON2SSE_INLINE int32x4_t vdotq_laneq_s32_impl(
-    int32x4_t acc,
-    int8x16_t a,
-    int8x16_t b)
-{
-    static_assert(Lane >= 0 && Lane < 4, "Invalid lane");
-    const __m128i zero = _mm_setzero_si128();
-    const __m128i bl = _mm_shuffle_epi32(
-        b, _MM_SHUFFLE(Lane, Lane, Lane, Lane));
-    const __m128i asign = _mm_cmpgt_epi8(zero, a);
-    const __m128i bsign = _mm_cmpgt_epi8(zero, bl);
-    const __m128i alo = _mm_unpacklo_epi8(a, asign);
-    const __m128i ahi = _mm_unpackhi_epi8(a, asign);
-    const __m128i blo = _mm_unpacklo_epi8(bl, bsign);
-    const __m128i bhi = _mm_unpackhi_epi8(bl, bsign);
-    const __m128i lo = _mm_madd_epi16(alo, blo);
-    const __m128i hi = _mm_madd_epi16(ahi, bhi);
-    const __m128i dot = _mm_hadd_epi32(lo, hi);
-    return _mm_add_epi32(acc, dot);
 }
 //****************** 2 elements load  *********************************************
 _NEON2SSESTORAGE uint8x16x2_t vld2q_u8(__transfersize(32) uint8_t const * ptr); // VLD2.8 {d0, d2}, [r0]
@@ -16870,8 +16837,14 @@ _NEON2SSE_GLOBAL poly16x8_t vreinterpretq_p16_p8 (poly8x16_t t);
 #define vreinterpretq_p16_p8  vreinterpretq_s16_p8
 
 //****  Integer to float  ******
-#include <fp16/fp16.h>
-
+_NEON2SSE_INLINE __m128 half_to_float4(__m128i a)
+{
+#if __F16C__
+    return _mm_cvtph_ps(a);
+#endif
+}
+//#include <fp16/fp16.h>
+#include "ggml-impl.h"
 //        values[i] = fp16_ieee_from_fp32_value(a.val[0].m128_f32[i]);
 //        values[i + 4] = fp16_ieee_from_fp32_value(a.val[1].m128_f32[i]);
 //        values[i] = fp16_ieee_from_fp32_value(a.val[0][i]);
@@ -16884,40 +16857,30 @@ _NEON2SSE_INLINE uint16x8_t vreinterpretq_u16_f16(
 
     for (int i = 0; i < 4; ++i)
     {
-        values[i] = fp16_ieee_from_fp32_value(a.val[0][i]);
-        values[i + 4] = fp16_ieee_from_fp32_value(a.val[1][i]);
+        values[i] =  GGML_COMPUTE_FP32_TO_FP16(a.val[0][i]);
+        values[i + 4] = GGML_COMPUTE_FP32_TO_FP16(a.val[1][i]);
     }
 
     return _mm_loadu_si128(
         reinterpret_cast<const __m128i*>(values));
 }
 
-
-_NEON2SSE_INLINE float16x8_t vreinterpretq_f16_u16(
-    const uint16x8_t& a)
+_NEON2SSE_INLINE float16x8_t vreinterpretq_f16_u16(uint16x8_t a)
 {
-    float16x8_t result;
-
-    uint16_t values[8];
-
-    _mm_storeu_si128(
-        reinterpret_cast<__m128i*>(values), a);
-
-    result.val[0] = _mm_set_ps(
-        fp16_ieee_to_fp32_value(values[3]),
-        fp16_ieee_to_fp32_value(values[2]),
-        fp16_ieee_to_fp32_value(values[1]),
-        fp16_ieee_to_fp32_value(values[0])
-    );
-
-    result.val[1] = _mm_set_ps(
-        fp16_ieee_to_fp32_value(values[7]),
-        fp16_ieee_to_fp32_value(values[6]),
-        fp16_ieee_to_fp32_value(values[5]),
-        fp16_ieee_to_fp32_value(values[4])
-    );
-
-    return result;
+    float16x8_t res;
+//    __m128i zero, sign, exp, mant;
+    __m128i zero;
+    __m128i lo, hi;
+    zero = _mm_setzero_si128();
+    // Split eight FP16 values into two groups of four.
+    lo = _mm_unpacklo_epi16(a, zero);
+    hi = _mm_unpackhi_epi16(a, zero);
+    // FP16 -> FP32 conversion requires proper IEEE-754
+    // half-to-single conversion, including subnormals,
+    // infinities and NaNs.
+    res.val[0] = half_to_float4(lo);
+    res.val[1] = half_to_float4(hi);
+    return res;
 }
 
 //****  Integer to float  ******
@@ -17715,4 +17678,4 @@ _NEON2SSE_INLINE int64x2_t vtrn2q_s64(int64x2_t a, int64x2_t b)
 #endif
 #endif
 
-#endif /* NEON2SSE_H *
+#endif /* NEON2SSE_H */
