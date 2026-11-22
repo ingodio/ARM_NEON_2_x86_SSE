@@ -161,7 +161,6 @@ typedef   float float32_t;
 #if !defined(__clang__)
 typedef   float __fp16;
 #endif
-
 typedef   double float64_t;
 
 typedef union   __m64_128 {
